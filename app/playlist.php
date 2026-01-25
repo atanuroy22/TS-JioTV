@@ -110,21 +110,36 @@ function parse_m3u_https_channels($m3u_content)
     return $channels;
 }
 
+function ts_xtream_first_csv_value($value)
+{
+    $value = trim((string) $value);
+    if ($value === '') return '';
+    if (strpos($value, ',') === false) return $value;
+    return trim(explode(',', $value, 2)[0]);
+}
+
+function ts_xtream_auth_ok($username, $password)
+{
+    $cfg = $GLOBALS['config'] ?? [];
+    $expected_user = trim((string)($cfg['xtream']['username'] ?? ''));
+    $expected_pass = trim((string)($cfg['xtream']['password'] ?? ''));
+
+    if ($expected_user === '' && $expected_pass === '') {
+        return true;
+    }
+
+    return hash_equals($expected_user, (string) $username) && hash_equals($expected_pass, (string) $password);
+}
+
 // Generate a unique filename for the M3U playlist
 $jio_fname = 'TS-JioTV_' . md5(time() . 'JioTV') . '.m3u';
 
-$forwarded_proto = trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
-if ($forwarded_proto !== '' && strpos($forwarded_proto, ',') !== false) {
-    $forwarded_proto = trim(explode(',', $forwarded_proto, 2)[0]);
-}
+$forwarded_proto = ts_xtream_first_csv_value($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '');
 $protocol = ($forwarded_proto === 'https' || $forwarded_proto === 'http')
     ? ($forwarded_proto . '://')
     : (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://');
 
-$forwarded_host = trim((string)($_SERVER['HTTP_X_FORWARDED_HOST'] ?? ''));
-if ($forwarded_host !== '' && strpos($forwarded_host, ',') !== false) {
-    $forwarded_host = trim(explode(',', $forwarded_host, 2)[0]);
-}
+$forwarded_host = ts_xtream_first_csv_value($_SERVER['HTTP_X_FORWARDED_HOST'] ?? '');
 $host_jio = $forwarded_host !== '' ? $forwarded_host : trim((string)($_SERVER['HTTP_HOST'] ?? ''));
 
 if ($host_jio === '') {
@@ -139,6 +154,15 @@ if (strpos($host_jio, ':') === false) {
 }
 
 $jio_path = $protocol . $host_jio . str_replace(" ", "%20", str_replace(basename($_SERVER['PHP_SELF']), '', $_SERVER['PHP_SELF']));
+$jio_base = rtrim($jio_path, '/') . '/';
+$host_only = $host_jio;
+$port = '';
+if (strpos($host_jio, ':') !== false) {
+    [$host_only, $port] = array_pad(explode(':', $host_jio, 2), 2, '');
+}
+if ($port === '') {
+    $port = ($protocol === 'https://') ? '443' : '80';
+}
 
 // Decode the URL and fetch the JSON data
 $url = "==gbvNnauEGdhR2bpp2L2R3bpp2LnBXZ2R3LvlmLiVHa0l2ZuYDO3UHa0RXat9yL6MHc0RHa";
@@ -201,12 +225,307 @@ if ($debug === 'ext') {
     exit;
 }
 
+$api = $_GET['api'] ?? '';
+if ($api === 'raw') {
+    $raw_username = $_GET['username'] ?? '';
+    $raw_password = $_GET['password'] ?? '';
+    if (!ts_xtream_auth_ok($raw_username, $raw_password)) {
+        http_response_code(401);
+        exit('Unauthorized');
+    }
+
+    $stream_id = (string)($_GET['id'] ?? ($_GET['stream_id'] ?? ''));
+    if ($stream_id === '') {
+        http_response_code(400);
+        exit('Missing id');
+    }
+
+    if (ts_starts_with($stream_id, 'ext_')) {
+        $selected = null;
+        foreach ($external_channels as $ch) {
+            if ((string)($ch['channel_id'] ?? '') === $stream_id) {
+                $selected = $ch;
+                break;
+            }
+        }
+        $direct = (string)($selected['streamUrl'] ?? '');
+        if ($direct !== '' && ts_starts_with($direct, 'https://')) {
+            header('Location: ' . $direct, true, 302);
+            exit;
+        }
+        http_response_code(404);
+        exit('Not found');
+    }
+
+    $haystack = getJioTvData($stream_id);
+    if (empty($haystack->code) || (int)$haystack->code !== 200) {
+        refresh_token();
+        $haystack = getJioTvData($stream_id);
+    }
+
+    if (empty($haystack->code) || (int)$haystack->code !== 200) {
+        http_response_code(502);
+        exit('Upstream error');
+    }
+
+    $target = (string)($haystack->result ?? '');
+    if (!ts_starts_with($target, 'http://') && !ts_starts_with($target, 'https://')) {
+        http_response_code(502);
+        exit('Invalid upstream url');
+    }
+
+    header('Location: ' . $target, true, 302);
+    exit;
+}
+
+$xtream_username = $_GET['username'] ?? '';
+$xtream_password = $_GET['password'] ?? '';
+$xtream_auth = ts_xtream_auth_ok($xtream_username, $xtream_password);
+
+if ($api === 'xtream_xmltv') {
+    header('Location: https://avkb.short.gy/jioepg.xml.gz', true, 302);
+    exit;
+}
+
+if ($api === 'xtream_live') {
+    if (!$xtream_auth) {
+        http_response_code(401);
+        exit('Unauthorized');
+    }
+
+    $stream_id = (string)($_GET['stream_id'] ?? '');
+
+    if ($stream_id !== '' && ts_starts_with($stream_id, 'ext_')) {
+        $selected = null;
+        foreach ($external_channels as $ch) {
+            if ((string)($ch['channel_id'] ?? '') === $stream_id) {
+                $selected = $ch;
+                break;
+            }
+        }
+        $direct = (string)($selected['streamUrl'] ?? '');
+        if ($direct !== '' && ts_starts_with($direct, 'https://')) {
+            header('Location: ' . $direct, true, 302);
+            exit;
+        }
+        http_response_code(404);
+        exit('Not found');
+    }
+
+    $raw = (string)($_GET['raw'] ?? '');
+    if ($raw === '1' || $raw === 'true') {
+        $haystack = getJioTvData($stream_id);
+        if (empty($haystack->code) || (int)$haystack->code !== 200) {
+            refresh_token();
+            $haystack = getJioTvData($stream_id);
+        }
+        if (!empty($haystack->code) && (int)$haystack->code === 200 && !empty($haystack->result)) {
+            header('Location: ' . (string)$haystack->result, true, 302);
+            exit;
+        }
+        http_response_code(502);
+        exit('Upstream error');
+    }
+
+    $target = isApache()
+        ? ($jio_base . 'ts_live_' . urlencode($stream_id) . '.m3u8')
+        : ($jio_base . 'live.php?id=' . urlencode($stream_id) . '&e=.m3u8');
+    header('Location: ' . $target, true, 302);
+    exit;
+}
+
+if ($api === 'xtream' || $api === 'xtream_get') {
+    $server_info = [
+        'url' => $host_only,
+        'port' => (string) $port,
+        'https_port' => '443',
+        'server_protocol' => rtrim($protocol, '://'),
+        'rtmp_port' => '0',
+        'timestamp_now' => time(),
+        'time_now' => gmdate('Y-m-d H:i:s'),
+    ];
+
+    $auth_payload = [
+        'user_info' => [
+            'username' => (string) $xtream_username,
+            'password' => (string) $xtream_password,
+            'message' => $xtream_auth ? '' : 'Invalid credentials',
+            'auth' => $xtream_auth ? 1 : 0,
+            'status' => $xtream_auth ? 'Active' : 'Disabled',
+            'exp_date' => null,
+            'is_trial' => 0,
+            'active_cons' => 0,
+            'created_at' => time(),
+            'max_connections' => 1,
+            'allowed_output_formats' => ['m3u8', 'ts'],
+        ],
+        'server_info' => $server_info,
+    ];
+
+    if (!$xtream_auth) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($auth_payload, JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    if ($api === 'xtream_get') {
+        $type = $_GET['type'] ?? '';
+        if ($type === '' || $type === 'm3u' || $type === 'm3u_plus') {
+            $jio_channels = json_decode($json_data, true) ?? [];
+            if (!is_array($jio_channels)) $jio_channels = [];
+
+            header("Content-Type: application/vnd.apple.mpegurl");
+            header("Content-Disposition: inline; filename=$jio_fname");
+
+            $xtream_base = $jio_base;
+            $playlist = '#EXTM3U x-tvg-url="https://avkb.short.gy/jioepg.xml.gz"' . PHP_EOL;
+
+            foreach ($jio_channels as $channel) {
+                $channel_id = (string)($channel['channel_id'] ?? '');
+                $channel_name = (string)($channel['channel_name'] ?? '');
+                if ($channel_id === '' || $channel_name === '') continue;
+
+                $playlist .= sprintf(
+                    '#EXTINF:-1 tvg-id="%s" tvg-name="%s" group-title="%s" tvg-logo="%s"%s,%s',
+                    htmlspecialchars($channel_id, ENT_QUOTES, 'UTF-8'),
+                    htmlspecialchars($channel_name, ENT_QUOTES, 'UTF-8'),
+                    htmlspecialchars((string)($channel['channelCategoryId'] ?? ''), ENT_QUOTES, 'UTF-8'),
+                    htmlspecialchars((string)($channel['logoUrl'] ?? ''), ENT_QUOTES, 'UTF-8'),
+                    ($channel['isCatchupAvailable'] ?? '') === "True" ? ' catchup-days="7" catchup="auto"' : '',
+                    htmlspecialchars($channel_name, ENT_QUOTES, 'UTF-8')
+                ) . PHP_EOL;
+
+                $playlist .= $xtream_base . 'live/' . rawurlencode((string) $xtream_username) . '/' . rawurlencode((string) $xtream_password) . '/' . rawurlencode($channel_id) . '.m3u8' . PHP_EOL . PHP_EOL;
+            }
+
+            if (!empty($external_channels)) {
+                foreach ($external_channels as $channel) {
+                    $channel_id = (string)($channel['channel_id'] ?? '');
+                    $channel_name = (string)($channel['channel_name'] ?? '');
+                    $stream_url = (string)($channel['streamUrl'] ?? '');
+                    if ($channel_id === '' || $channel_name === '' || !ts_starts_with($stream_url, 'https://')) continue;
+
+                    $playlist .= sprintf(
+                        '#EXTINF:-1 tvg-id="%s" tvg-name="%s" group-title="%s" tvg-logo="%s",%s',
+                        htmlspecialchars($channel_id, ENT_QUOTES, 'UTF-8'),
+                        htmlspecialchars($channel_name, ENT_QUOTES, 'UTF-8'),
+                        htmlspecialchars((string)($channel['channelCategoryId'] ?? 'EXTRA'), ENT_QUOTES, 'UTF-8'),
+                        htmlspecialchars((string)($channel['logoUrl'] ?? ''), ENT_QUOTES, 'UTF-8'),
+                        htmlspecialchars($channel_name, ENT_QUOTES, 'UTF-8')
+                    ) . PHP_EOL;
+
+                    $playlist .= $xtream_base . 'live/' . rawurlencode((string) $xtream_username) . '/' . rawurlencode((string) $xtream_password) . '/' . rawurlencode($channel_id) . '.m3u8' . PHP_EOL . PHP_EOL;
+                }
+            }
+
+            echo $playlist;
+            exit;
+        }
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($auth_payload, JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $action = $_GET['action'] ?? '';
+    if ($action === '') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($auth_payload, JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $jio_channels = json_decode($json_data, true) ?? [];
+    if (!is_array($jio_channels)) $jio_channels = [];
+    $merged_channels = array_values(array_merge($jio_channels, is_array($external_channels) ? $external_channels : []));
+
+    if ($action === 'get_live_categories') {
+        $cat_map = [];
+        foreach ($merged_channels as $ch) {
+            $cat = trim((string)($ch['channelCategoryId'] ?? ''));
+            if ($cat === '') $cat = 'Uncategorized';
+            $cat_map[$cat] = true;
+        }
+
+        $out = [];
+        $i = 1;
+        foreach (array_keys($cat_map) as $cat_name) {
+            $out[] = [
+                'category_id' => (string) $i,
+                'category_name' => (string) $cat_name,
+                'parent_id' => 0,
+            ];
+            $i++;
+        }
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($out, JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    if ($action === 'get_live_streams') {
+        $cat_ids = [];
+        $i = 1;
+        foreach ($merged_channels as $ch) {
+            $cat = trim((string)($ch['channelCategoryId'] ?? ''));
+            if ($cat === '') $cat = 'Uncategorized';
+            if (!isset($cat_ids[$cat])) {
+                $cat_ids[$cat] = (string) $i;
+                $i++;
+            }
+        }
+
+        $out = [];
+        $num = 1;
+        foreach ($merged_channels as $ch) {
+            $channel_id = (string)($ch['channel_id'] ?? '');
+            $name = (string)($ch['channel_name'] ?? '');
+            if ($channel_id === '' || $name === '') continue;
+
+            $cat = trim((string)($ch['channelCategoryId'] ?? ''));
+            if ($cat === '') $cat = 'Uncategorized';
+
+            $is_catchup = ((string)($ch['isCatchupAvailable'] ?? 'False')) === 'True';
+
+            $out[] = [
+                'num' => $num,
+                'name' => $name,
+                'stream_type' => 'live',
+                'stream_id' => $channel_id,
+                'stream_icon' => (string)($ch['logoUrl'] ?? ''),
+                'epg_channel_id' => $channel_id,
+                'category_id' => $cat_ids[$cat] ?? '0',
+                'added' => (string) time(),
+                'custom_sid' => '',
+                'tv_archive' => $is_catchup ? 1 : 0,
+                'tv_archive_duration' => $is_catchup ? 7 : 0,
+                'direct_source' => ts_starts_with($channel_id, 'ext_')
+                    ? (string)($ch['streamUrl'] ?? '')
+                    : ($jio_base . 'live/' . rawurlencode((string) $xtream_username) . '/' . rawurlencode((string) $xtream_password) . '/' . rawurlencode($channel_id) . '.m3u8'),
+            ];
+            $num++;
+        }
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($out, JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    if ($action === 'get_vod_categories' || $action === 'get_series_categories' || $action === 'get_vod_streams' || $action === 'get_series' || $action === 'get_series_info') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([], JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($auth_payload, JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 $format = $_GET['format'] ?? '';
 if ($format === 'json') {
     header('Content-Type: application/json; charset=utf-8');
     $jio_channels = json_decode($json_data, true) ?? [];
     if (!is_array($jio_channels)) $jio_channels = [];
-
     $merged = array_values(array_merge($jio_channels, is_array($external_channels) ? $external_channels : []));
     echo json_encode($merged, JSON_UNESCAPED_SLASHES);
     exit;

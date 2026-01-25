@@ -37,7 +37,21 @@ $headers = [
 // Fetch data
 $url = sprintf("https://jiotvmblive.cdn.jio.com/bpk-tv/%s/Fallback/%s", $chs[0], $id);
 $hs = cUrlGetData($url, $headers);
-$cuk = get_and_refresh_cookie($url, $headers);
+if ($hs === '') {
+    try {
+        $cuk = get_and_refresh_cookie($url, $headers, 120, true);
+        $headers[0] = 'Cookie: ' . hex2bin($cuk);
+        $hs = cUrlGetData($url, $headers);
+    } catch (Throwable $e) {
+        $cuk = $cooks;
+    }
+} else {
+    try {
+        $cuk = get_and_refresh_cookie($url, $headers, 120);
+    } catch (Throwable $e) {
+        $cuk = $cooks;
+    }
+}
 
 // Prepare replacement arrays
 [$search, $replace] = $PROXY

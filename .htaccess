@@ -1,2 +1,13 @@
+RewriteEngine On
+RewriteRule ^player_api\.php/?$ app/playlist.php?api=xtream [QSA,L]
+RewriteRule ^get\.php/?$ app/playlist.php?api=xtream_get [QSA,L]
+RewriteRule ^xmltv\.php/?$ app/playlist.php?api=xtream_xmltv [QSA,L]
+RewriteRule ^live/([^/]+)/([^/]+)/([A-Za-z0-9_]+)\.(m3u8|ts)/?$ app/playlist.php?api=xtream_live&username=$1&password=$2&stream_id=$3&output=$4 [QSA,L]
+RewriteRule ^raw_([A-Za-z0-9-=-_-!-~--]+)\.m3u8/?$ app/live.php?id=$1 [NC,L]
+RewriteRule ^raw/([A-Za-z0-9-=-_-!-~--]+)\.m3u8/?$ app/live.php?id=$1 [NC,L]
+RewriteRule ^upraw_([A-Za-z0-9-=-_-!-~--]+)\.m3u8/?$ app/playlist.php?api=raw&id=$1 [NC,L]
+RewriteRule ^upraw/([A-Za-z0-9-=-_-!-~--]+)\.m3u8/?$ app/playlist.php?api=raw&id=$1 [NC,L]
+RewriteRule ^ts_live_([A-Za-z0-9-=-_-!-~--]+).m3u8/?$ app/live.php?id=$1 [NC,L]
+RewriteRule ^tsjio_playlist.m3u/?$ app/playlist.php [NC,L]
 RewriteCond %{REQUEST_FILENAME}.php -f
 RewriteRule !.*\.php$ %{REQUEST_FILENAME}.php [QSA,L]

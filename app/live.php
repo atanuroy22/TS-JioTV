@@ -40,8 +40,12 @@ if (empty($haystack->code) || $haystack->code !== 200) {
 
 // Parse response
 [$baseUrl, $query] = array_pad(explode('?', $haystack->result, 2), 2, '');
-$cookies_y = str_contains($query, "minrate=") ? explode("&", $query)[2] : $query;
-$cook = bin2hex($cookies_y);
+try {
+    $cook = get_and_refresh_cookie($haystack->result, $headers_1, 120);
+} catch (Throwable $e) {
+    $cookies_y = str_contains($query, "minrate=") ? explode("&", $query)[2] : $query;
+    $cook = bin2hex($cookies_y);
+}
 $chs = explode('/', $baseUrl);
 
 // Playback headers
@@ -70,9 +74,6 @@ if (str_contains($query, "/HLS/")) {
     $link_1  = implode('/', array_slice($chs, 0, 7));
     $data    = explode("_", $chs[5])[0];
     $playlist = cUrlGetData($haystack->result, $headers_1);
-
-    $cook = "__hdnea" . explode("__hdnea", hex2bin($cook))[1];
-    $cook = bin2hex($cook);
 
     $base_url = "s_live.php?id=$id&ck=$cook&link=";
     if (str_contains($playlist, "WL/")) {

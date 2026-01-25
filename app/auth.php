@@ -10,7 +10,13 @@ include "functions.php";
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Expose-Headers: Content-Length, Content-Range");
 header("Access-Control-Allow-Headers: Range");
+header("Access-Control-Allow-Methods: GET, HEAD, OPTIONS");
 header("Accept-Ranges: bytes");
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
 
 // Fetch credentials
 $cred = getCRED();
@@ -37,6 +43,9 @@ if (empty($cookies)) {
 }
 
 $headers = jio_headers($cookies, $access_token, $crm, $device_id, $ssoToken, $uniqueId);
+if (!empty($_SERVER['HTTP_RANGE'])) {
+    $headers[] = 'Range: ' . $_SERVER['HTTP_RANGE'];
+}
 
 // Determine request type
 $param = match (true) {

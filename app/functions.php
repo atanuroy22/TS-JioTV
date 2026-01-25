@@ -68,13 +68,21 @@ function refresh_token()
 }
 
 // Refresh cookie if necessary
-function get_and_refresh_cookie($url, $headers)
+function get_and_refresh_cookie($url, $headers, $max_age_seconds = COOKIE_EXPIRY_TIME, $force = false)
 {
   $filePath = DATA_FOLDER . '/cookie.jtv';
-  $cookieNeedsRefresh = !file_exists($filePath) || (time() - filemtime($filePath) > COOKIE_EXPIRY_TIME);
+  $max_age_seconds = is_numeric($max_age_seconds) ? (int)$max_age_seconds : COOKIE_EXPIRY_TIME;
+  $cookieNeedsRefresh = $force || !file_exists($filePath) || (time() - filemtime($filePath) > $max_age_seconds);
 
   if ($cookieNeedsRefresh) {
-    $cookies = getCookiesFromUrl($url, $headers);
+    $headersNoCookie = is_array($headers)
+      ? array_values(array_filter($headers, fn($h) => stripos((string)$h, 'cookie:') !== 0))
+      : [];
+
+    $cookies = getCookiesFromUrl($url, $headersNoCookie);
+    if (!isset($cookies['__hdnea__']) && is_array($headers) && $headers !== $headersNoCookie) {
+      $cookies = getCookiesFromUrl($url, $headers);
+    }
     if (isset($cookies['__hdnea__'])) {
       $cooKee = bin2hex('__hdnea__=' . $cookies['__hdnea__']);
       file_put_contents($filePath, $cooKee);
@@ -150,6 +158,14 @@ function cUrlGetData($url, $headers = null, $post_fields = null)
   curl_setopt($ch, CURLOPT_URL, $url);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
   curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+  curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+  curl_setopt($ch, CURLOPT_ENCODING, '');
+
+  if (stripos((string)$url, 'https://') === 0) {
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+  }
 
   if (!empty($post_fields)) {
     curl_setopt($ch, CURLOPT_POST, 1);
@@ -161,13 +177,8 @@ function cUrlGetData($url, $headers = null, $post_fields = null)
   }
 
   $data = curl_exec($ch);
-
-  if (curl_errno($ch)) {
-    echo 'Error:' . curl_error($ch);
-  }
-
   curl_close($ch);
-  return $data;
+  return $data === false ? '' : $data;
 }
 
 // Get credentials

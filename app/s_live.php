@@ -22,6 +22,12 @@ $id   = $_REQUEST["id"]   ?? '';
 $link = $_REQUEST["link"] ?? '';
 $data = $_REQUEST['data'] ?? '';
 
+try {
+  $ckNew = get_and_refresh_cookie('https://tv.media.jio.com/', [], 120);
+  if (!empty($ckNew)) $ck = $ckNew;
+} catch (Throwable $e) {
+}
+
 $headers = jio_sony_headers($ck, $id, $crm, $device_id, $access_token, $uniqueId, $ssoToken);
 
 // Common headers for all responses
