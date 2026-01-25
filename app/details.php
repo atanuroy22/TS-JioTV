@@ -255,10 +255,13 @@ $safe_watch_href = htmlspecialchars((string) $watch_href, ENT_QUOTES, 'UTF-8');
           <span class="sr-only">Refresh</span>
         </button>
 
+        <!--
         <button class="p-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg transition-all group relative" id="logoutButton">
           <span class="iconify text-xl" data-icon="mdi:logout"></span>
           <span class="sr-only">Logout</span>
         </button>
+        -->
+        <button id="logoutButton" type="button" class="hidden" aria-hidden="true" tabindex="-1"></button>
       </div>
     </div>
   </header>
