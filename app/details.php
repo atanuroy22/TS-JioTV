@@ -206,7 +206,7 @@ $safe_watch_href = htmlspecialchars((string) $watch_href, ENT_QUOTES, 'UTF-8');
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= $safe_name ?> | JioTV+ ReBorn</title>
+  <title><?= $safe_name ?> | JioTV+ </title>
   <link rel="icon" href="https://ik.imagekit.io/techiesneh/tv_logo/jtv-plus_TMaGGk6N0.png" type="image/png">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <script src="https://code.iconify.design/2/2.1.2/iconify.min.js"></script>

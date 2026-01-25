@@ -57,7 +57,7 @@ function getFormattedTime($startEpoch)
 
 <head>
   <meta charset="UTF-8">
-  <title>JioTV+ ReBorn : <?= htmlspecialchars($cid) ?> Catchup</title>
+  <title>JioTV+ : <?= htmlspecialchars($cid) ?> Catchup</title>
   <link rel="icon" href="https://ik.imagekit.io/techiesneh/tv_logo/jtv-plus_TMaGGk6N0.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
@@ -259,7 +259,7 @@ function getFormattedTime($startEpoch)
 
   <footer class="bg-gray-800 mt-12 py-4">
     <div class="container mx-auto text-center text-gray-400">
-      <p>&copy; 2021-<?= date('Y') ?> SnehTV, Inc. All rights reserved.</p>
+      <p>&copy; 2021-<?= date('Y') ?> Atanu Roy, Inc. All rights reserved.</p>
     </div>
   </footer>
 
