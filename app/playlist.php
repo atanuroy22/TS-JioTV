@@ -7,19 +7,137 @@
 error_reporting(0);
 include "functions.php";
 
+function ts_starts_with($haystack, $needle)
+{
+    $haystack = (string) $haystack;
+    $needle = (string) $needle;
+    if ($needle === '') return true;
+    return substr($haystack, 0, strlen($needle)) === $needle;
+}
+
+function ts_fetch_url($url)
+{
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+    curl_setopt($ch, CURLOPT_ENCODING, '');
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ["User-Agent: TS-JioTV", "Accept-Encoding: gzip, deflate"]);
+
+    if (ts_starts_with($url, 'https://')) {
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    }
+
+    $data = curl_exec($ch);
+    curl_close($ch);
+    return $data;
+}
+
+function parse_m3u_https_channels($m3u_content)
+{
+    $lines = preg_split("/\r\n|\n|\r/", (string) $m3u_content);
+    $channels = [];
+
+    $pending = null;
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '') continue;
+
+        if (ts_starts_with($line, '#EXTINF:')) {
+            $pending = [
+                'extinf' => $line,
+            ];
+            continue;
+        }
+
+        if ($line[0] === '#') {
+            continue;
+        }
+
+        if ($pending === null) {
+            continue;
+        }
+
+        $stream_url = $line;
+        $pending_extinf = $pending['extinf'];
+        $pending = null;
+
+        if (!ts_starts_with($stream_url, 'https://')) {
+            continue;
+        }
+
+        $name = '';
+        $comma_pos = strrpos($pending_extinf, ',');
+        if ($comma_pos !== false) {
+            $name = trim(substr($pending_extinf, $comma_pos + 1));
+        }
+
+        $attrs = [];
+        if (preg_match_all('/([A-Za-z0-9_-]+)="([^"]*)"/', $pending_extinf, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $m) {
+                $attrs[strtolower($m[1])] = $m[2];
+            }
+        }
+
+        $tvg_name = $attrs['tvg-name'] ?? '';
+        $tvg_logo = $attrs['tvg-logo'] ?? '';
+        $group_title = $attrs['group-title'] ?? '';
+        $lang = $attrs['tvg-language'] ?? '';
+
+        $final_name = $tvg_name !== '' ? $tvg_name : $name;
+        if ($final_name === '') {
+            continue;
+        }
+
+        $ext_id = 'ext_' . substr(sha1($stream_url), 0, 16);
+
+        $channels[] = [
+            'channel_id' => $ext_id,
+            'channel_name' => $final_name,
+            'channelCategoryId' => $group_title !== '' ? $group_title : 'HTTPS',
+            'channelLanguageId' => $lang !== '' ? $lang : 'Unknown',
+            'isCatchupAvailable' => 'False',
+            'isHD' => 'False',
+            'logoUrl' => $tvg_logo !== '' ? $tvg_logo : 'https://ik.imagekit.io/techiesneh/tv_logo/jtv-plus_TMaGGk6N0.png',
+            'sourceType' => 'ext',
+            'streamUrl' => $stream_url,
+        ];
+    }
+
+    return $channels;
+}
+
 // Generate a unique filename for the M3U playlist
 $jio_fname = 'TS-JioTV_' . md5(time() . 'JioTV') . '.m3u';
 
-// Determine the protocol and host
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://';
-$local_ip = getHostByName(php_uname('n'));
-$host_jio = ($_SERVER['SERVER_ADDR'] !== '127.0.0.1' && $_SERVER['SERVER_ADDR'] !== 'localhost') ? $_SERVER['HTTP_HOST'] : $local_ip;
+$forwarded_proto = trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+if ($forwarded_proto !== '' && strpos($forwarded_proto, ',') !== false) {
+    $forwarded_proto = trim(explode(',', $forwarded_proto, 2)[0]);
+}
+$protocol = ($forwarded_proto === 'https' || $forwarded_proto === 'http')
+    ? ($forwarded_proto . '://')
+    : (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://');
 
-if (strpos($host_jio, $_SERVER['SERVER_PORT']) === false) {
-    $host_jio .= ':' . $_SERVER['SERVER_PORT'];
+$forwarded_host = trim((string)($_SERVER['HTTP_X_FORWARDED_HOST'] ?? ''));
+if ($forwarded_host !== '' && strpos($forwarded_host, ',') !== false) {
+    $forwarded_host = trim(explode(',', $forwarded_host, 2)[0]);
+}
+$host_jio = $forwarded_host !== '' ? $forwarded_host : trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+
+if ($host_jio === '') {
+    $host_jio = getHostByName(php_uname('n'));
 }
 
-// Construct the Jio path
+if (strpos($host_jio, ':') === false) {
+    $server_port = (int)($_SERVER['SERVER_PORT'] ?? 0);
+    if ($server_port !== 0 && $server_port !== 80 && $server_port !== 443) {
+        $host_jio .= ':' . $server_port;
+    }
+}
+
 $jio_path = $protocol . $host_jio . str_replace(" ", "%20", str_replace(basename($_SERVER['PHP_SELF']), '', $_SERVER['PHP_SELF']));
 
 // Decode the URL and fetch the JSON data
@@ -34,17 +152,7 @@ if (file_exists($cache_file) && (time() - filemtime($cache_file)) < $cache_ttl_s
 }
 
 if (empty($json_data)) {
-    $context = stream_context_create([
-        'http' => [
-            'timeout' => 8,
-            'header' => "User-Agent: TS-JioTV\r\n",
-        ],
-        'https' => [
-            'timeout' => 8,
-            'header' => "User-Agent: TS-JioTV\r\n",
-        ],
-    ]);
-    $fresh_data = @file_get_contents($remote_url, false, $context);
+    $fresh_data = ts_fetch_url($remote_url);
 
     if (!empty($fresh_data) && json_decode($fresh_data, true) !== null) {
         $json_data = $fresh_data;
@@ -54,10 +162,53 @@ if (empty($json_data)) {
     }
 }
 
+$external_m3u_url = 'https://atanuroy22.github.io/iptv/output/all.m3u';
+$external_cache_file = __DIR__ . '/assets/data/external_channels.json';
+$external_channels = [];
+
+if (file_exists($external_cache_file) && (time() - filemtime($external_cache_file)) < $cache_ttl_seconds) {
+    $external_cached = file_get_contents($external_cache_file);
+    $external_channels = json_decode($external_cached, true) ?? [];
+}
+
+if (empty($external_channels)) {
+    $m3u = ts_fetch_url($external_m3u_url);
+    if (!empty($m3u)) {
+        $parsed = parse_m3u_https_channels($m3u);
+        if (!empty($parsed)) {
+            $external_channels = $parsed;
+            @file_put_contents($external_cache_file, json_encode($external_channels, JSON_UNESCAPED_SLASHES), LOCK_EX);
+        }
+    }
+}
+
+$debug = $_GET['debug'] ?? '';
+if ($debug === 'ext') {
+    header('Content-Type: application/json; charset=utf-8');
+    $sample = '';
+    if (isset($m3u) && !empty($m3u)) {
+        $sample = substr($m3u, 0, 400);
+    }
+    echo json_encode([
+        'external_url' => $external_m3u_url,
+        'cache_file' => $external_cache_file,
+        'cache_file_exists' => file_exists($external_cache_file),
+        'cache_file_bytes' => file_exists($external_cache_file) ? filesize($external_cache_file) : 0,
+        'fetched_bytes' => isset($m3u) ? strlen((string) $m3u) : 0,
+        'parsed_count' => is_array($external_channels) ? count($external_channels) : 0,
+        'm3u_sample' => $sample,
+    ], JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 $format = $_GET['format'] ?? '';
 if ($format === 'json') {
     header('Content-Type: application/json; charset=utf-8');
-    echo $json_data ?: '[]';
+    $jio_channels = json_decode($json_data, true) ?? [];
+    if (!is_array($jio_channels)) $jio_channels = [];
+
+    $merged = array_values(array_merge($jio_channels, is_array($external_channels) ? $external_channels : []));
+    echo json_encode($merged, JSON_UNESCAPED_SLASHES);
     exit;
 }
 
@@ -99,6 +250,33 @@ if ($json !== null) {
             $channel_name
         ) . PHP_EOL;
 
+        $jio_data .= $stream_url . PHP_EOL . PHP_EOL;
+    }
+}
+
+if (!empty($external_channels)) {
+    foreach ($external_channels as $channel) {
+        $channel_id = htmlspecialchars($channel['channel_id'] ?? '', ENT_QUOTES, 'UTF-8');
+        $channel_name = htmlspecialchars($channel['channel_name'] ?? '', ENT_QUOTES, 'UTF-8');
+        $channel_category = htmlspecialchars($channel['channelCategoryId'] ?? 'HTTPS', ENT_QUOTES, 'UTF-8');
+        $channel_language = htmlspecialchars($channel['channelLanguageId'] ?? 'Unknown', ENT_QUOTES, 'UTF-8');
+        $logo_url = htmlspecialchars($channel['logoUrl'] ?? '', ENT_QUOTES, 'UTF-8');
+        $stream_url = $channel['streamUrl'] ?? '';
+
+        if ($channel_id === '' || $channel_name === '' || !ts_starts_with((string) $stream_url, 'https://')) {
+            continue;
+        }
+
+        $jio_data .= sprintf(
+            '#EXTINF:-1 tvg-id="%s" tvg-name="%s" tvg-type="%s" group-title="EXTRA %s" tvg-language="%s" tvg-logo="%s",%s',
+            $channel_id,
+            $channel_name,
+            $channel_category,
+            $channel_category,
+            $channel_language,
+            $logo_url,
+            $channel_name
+        ) . PHP_EOL;
         $jio_data .= $stream_url . PHP_EOL . PHP_EOL;
     }
 }

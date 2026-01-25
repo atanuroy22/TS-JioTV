@@ -51,7 +51,7 @@ $logo = "https://jiotv.catchup.cdn.jio.com/dare_images/shows/$dates/$srno.jpg";
 <head>
     <title><?= $name ?> | JioTV +</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="description" content="ENJOY FREE LIVE TV">
+    <meta name="description" content="ENJOY LIVE TV">
     <meta name="keywords" content="LIVETV, SPORTS, MOVIES, MUSIC">
     <meta name="author" content="TSNEH">
     <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />

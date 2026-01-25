@@ -6,22 +6,6 @@
 error_reporting(0);
 include "cpfunctions.php";
 
-// Get protocol and host information
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://';
-$local_ip = getHostByName(php_uname('n'));
-$host_jio = ($_SERVER['SERVER_ADDR'] !== '127.0.0.1' && $_SERVER['SERVER_ADDR'] !== 'localhost')
-  ? $_SERVER['HTTP_HOST']
-  : $local_ip;
-
-// Handle port information
-if (strpos($host_jio, $_SERVER['SERVER_PORT']) === false) {
-  $host_jio .= ':' . $_SERVER['SERVER_PORT'];
-}
-
-// Construct base path
-$jio_path = $protocol . $host_jio . str_replace(basename($_SERVER['PHP_SELF']), '', $_SERVER['PHP_SELF']);
-$jio_path = rtrim($jio_path, '/');
-
 // Process request data
 $data = null;
 if (isset($_GET['data'])) {
@@ -36,9 +20,9 @@ if (isset($_GET['data'])) {
 }
 
 if (isApache()) {
-  $cp_url_host = "/cplay_";
+  $cp_url_host = "cplay_";
 } else {
-  $cp_url_host = "/cplay.php?data=";
+  $cp_url_host = "cplay.php?data=";
 }
 
 
@@ -173,7 +157,7 @@ function getFormattedTime($startEpoch)
             $begin,
             $end
           ]);
-          $link = $jio_path . $cp_url_host . bin2hex($data);
+          $link = $cp_url_host . bin2hex($data);
         ?>
           <div class="episode-card rounded-xl p-6" data-aos="fade-up" data-aos-delay="<?= $index * 50 ?>">
             <img src="<?= htmlspecialchars($episodePoster) ?>"

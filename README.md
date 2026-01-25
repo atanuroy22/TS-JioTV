@@ -1,4 +1,4 @@
-<div align="center">
+<!-- <div align="center">
   <img src="https://i.ibb.co/BcjC6R8/jiotv.png" width="120">
   <h1 align="center">TS-JioTV : ReBorn</h1>
   <p align="center">PHP Script for JioTV Streaming with Catchup & Multi-Device Support</p>
@@ -111,7 +111,7 @@
 
 ## [![Star History Chart](https://api.star-history.com/svg?repos=atanuroy22/TS-JioTV&type=Date)](https://www.star-history.com/#atanuroy22/TS-JioTV&Date) -->
 
-Special Thanks the author [mitthu786](https://github.com/mitthu786) for the script.
+<!-- Special Thanks the author [mitthu786](https://github.com/mitthu786) for the script. -->
 
 <!-- ## 📞 Contact & Support -->
 
@@ -122,4 +122,4 @@ Special Thanks the author [mitthu786](https://github.com/mitthu786) for the scri
 
 <div align="center">
   <strong>© 2021-25 👨🏻‍💻 Atanu Roy</strong>
-</div>
+</div> -->

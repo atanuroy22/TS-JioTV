@@ -6,6 +6,110 @@
 error_reporting(0);
 include "functions.php";
 
+$ext_id = $_GET['ext'] ?? '';
+$is_external = !empty($ext_id);
+
+function ts_ext_starts_with($haystack, $needle)
+{
+  $haystack = (string) $haystack;
+  $needle = (string) $needle;
+  if ($needle === '') return true;
+  return substr($haystack, 0, strlen($needle)) === $needle;
+}
+
+function ts_ext_fetch_url($url)
+{
+  $ch = curl_init();
+  curl_setopt($ch, CURLOPT_URL, $url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
+  curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+  curl_setopt($ch, CURLOPT_ENCODING, '');
+  curl_setopt($ch, CURLOPT_HTTPHEADER, ["User-Agent: TS-JioTV", "Accept-Encoding: gzip, deflate"]);
+
+  if (ts_ext_starts_with($url, 'https://')) {
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+  }
+
+  $data = curl_exec($ch);
+  curl_close($ch);
+  return $data;
+}
+
+function ts_ext_parse_m3u_https_channels($m3u_content)
+{
+  $lines = preg_split("/\r\n|\n|\r/", (string) $m3u_content);
+  $channels = [];
+
+  $pending_extinf = '';
+  foreach ($lines as $line) {
+    $line = trim($line);
+    if ($line === '') continue;
+
+    if (ts_ext_starts_with($line, '#EXTINF:')) {
+      $pending_extinf = $line;
+      continue;
+    }
+
+    if ($line[0] === '#') {
+      continue;
+    }
+
+    if ($pending_extinf === '') {
+      continue;
+    }
+
+    $stream_url = $line;
+    $extinf = $pending_extinf;
+    $pending_extinf = '';
+
+    if (!ts_ext_starts_with($stream_url, 'https://')) {
+      continue;
+    }
+
+    $name = '';
+    $comma_pos = strrpos($extinf, ',');
+    if ($comma_pos !== false) {
+      $name = trim(substr($extinf, $comma_pos + 1));
+    }
+
+    $attrs = [];
+    if (preg_match_all('/([A-Za-z0-9_-]+)="([^"]*)"/', $extinf, $matches, PREG_SET_ORDER)) {
+      foreach ($matches as $m) {
+        $attrs[strtolower($m[1])] = $m[2];
+      }
+    }
+
+    $tvg_name = $attrs['tvg-name'] ?? '';
+    $tvg_logo = $attrs['tvg-logo'] ?? '';
+    $group_title = $attrs['group-title'] ?? '';
+    $lang = $attrs['tvg-language'] ?? '';
+
+    $final_name = $tvg_name !== '' ? $tvg_name : $name;
+    if ($final_name === '') {
+      continue;
+    }
+
+    $ext_channel_id = 'ext_' . substr(sha1($stream_url), 0, 16);
+
+    $channels[] = [
+      'channel_id' => $ext_channel_id,
+      'channel_name' => $final_name,
+      'channelCategoryId' => $group_title !== '' ? $group_title : 'HTTPS',
+      'channelLanguageId' => $lang !== '' ? $lang : 'Unknown',
+      'isCatchupAvailable' => 'False',
+      'isHD' => 'False',
+      'logoUrl' => $tvg_logo !== '' ? $tvg_logo : 'https://ik.imagekit.io/techiesneh/tv_logo/jtv-plus_TMaGGk6N0.png',
+      'sourceType' => 'ext',
+      'streamUrl' => $stream_url,
+    ];
+  }
+
+  return $channels;
+}
+
 $data = null;
 if (isset($_GET['data'])) {
   $hex = $_GET['data'];
@@ -19,11 +123,11 @@ if (isset($_GET['data'])) {
 }
 
 if (isApache()) {
-  $url_host = "/play_";
-  $cp_url_host = "/catchup/cp_";
+  $url_host = "play_";
+  $cp_url_host = "catchup/cp_";
 } else {
-  $url_host = "/play.php?data=";
-  $cp_url_host = "/catchup/cp.php?data=";
+  $url_host = "play.php?data=";
+  $cp_url_host = "catchup/cp.php?data=";
 }
 
 if (!empty($hex)) {
@@ -31,23 +135,69 @@ if (!empty($hex)) {
   $data = explode('=?=', $decoded);
 }
 
-$cid = $data[0];
-$id = $data[1];
+$cid = $data[0] ?? '';
+$id = $data[1] ?? '';
 $name = strtoupper(str_replace('_', ' ', $cid));
 $image = 'https://jiotv.catchup.cdn.jio.com/dare_images/images/' . $cid . '.png';
-$c = $data[2];
-
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://';
-$local_ip = getHostByName(php_uname('n'));
-$host_jio = ($_SERVER['SERVER_ADDR'] !== "127.0.0.1" && $_SERVER['SERVER_ADDR'] !== 'localhost')
-  ? $_SERVER['HTTP_HOST']
-  : $local_ip . ($_SERVER['SERVER_PORT'] ? ':' . $_SERVER['SERVER_PORT'] : '');
-
-$jio_path = $protocol . $host_jio . str_replace(basename($_SERVER['PHP_SELF']), '', $_SERVER['PHP_SELF']);
-$jio_path = rtrim($jio_path, '/');
+$c = $data[2] ?? false;
 
 $file_path = 'assets/data/credskey.jtv';
 $file_exists = file_exists($file_path);
+
+$watch_href = $url_host . bin2hex($cid . '=?=' . $id);
+
+if ($is_external) {
+  $external_cache_file = __DIR__ . '/assets/data/external_channels.json';
+  $channels = [];
+  if (file_exists($external_cache_file)) {
+    $channels = json_decode(file_get_contents($external_cache_file), true) ?? [];
+  }
+
+  $selected = null;
+  if (is_array($channels)) {
+    foreach ($channels as $ch) {
+      if (($ch['channel_id'] ?? '') === $ext_id) {
+        $selected = $ch;
+        break;
+      }
+    }
+  }
+
+  if (!$selected) {
+    $external_m3u_url = 'https://atanuroy22.github.io/iptv/output/all.m3u';
+    $m3u = ts_ext_fetch_url($external_m3u_url);
+    if (!empty($m3u)) {
+      $parsed = ts_ext_parse_m3u_https_channels($m3u);
+      if (!empty($parsed)) {
+        $channels = $parsed;
+        @file_put_contents($external_cache_file, json_encode($channels, JSON_UNESCAPED_SLASHES), LOCK_EX);
+        foreach ($channels as $ch) {
+          if (($ch['channel_id'] ?? '') === $ext_id) {
+            $selected = $ch;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (!$selected) {
+    http_response_code(404);
+    exit('Channel not found');
+  }
+
+  $cid = (string) ($selected['channel_id'] ?? $ext_id);
+  $id = $cid;
+  $name = strtoupper((string) ($selected['channel_name'] ?? 'Live'));
+  $image = (string) ($selected['logoUrl'] ?? 'https://ik.imagekit.io/techiesneh/tv_logo/jtv-plus_TMaGGk6N0.png');
+  $c = false;
+  $watch_href = 'play.php?ext=' . urlencode($cid);
+  $file_exists = true;
+}
+
+$safe_name = htmlspecialchars((string) $name, ENT_QUOTES, 'UTF-8');
+$safe_image = htmlspecialchars((string) $image, ENT_QUOTES, 'UTF-8');
+$safe_watch_href = htmlspecialchars((string) $watch_href, ENT_QUOTES, 'UTF-8');
 
 ?>
 <!DOCTYPE html>
@@ -56,7 +206,7 @@ $file_exists = file_exists($file_path);
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= $name ?> | JioTV+ ReBorn</title>
+  <title><?= $safe_name ?> | JioTV+ ReBorn</title>
   <link rel="icon" href="https://ik.imagekit.io/techiesneh/tv_logo/jtv-plus_TMaGGk6N0.png" type="image/png">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <script src="https://code.iconify.design/2/2.1.2/iconify.min.js"></script>
@@ -117,11 +267,11 @@ $file_exists = file_exists($file_path);
   <main class="container mx-auto pt-24 pb-12 px-4">
     <div class="glass-effect rounded-2xl p-4 md:p-8 mb-6 md:mb-8 mx-2 md:mx-0" data-aos="fade-up">
       <div class="text-center space-y-4 md:space-y-6">
-        <img src="<?= $image ?>" alt="<?= $name ?>"
+        <img src="<?= $safe_image ?>" alt="<?= $safe_name ?>"
           class="w-24 h-24 md:w-32 md:h-32 mx-auto rounded-xl mb-4 md:mb-6 shadow-lg">
 
         <h2 class="text-2xl md:text-3xl font-bold gradient-text mb-2 md:mb-4">
-          <?= $name ?>
+          <?= $safe_name ?>
         </h2>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 justify-items-center">
@@ -147,7 +297,7 @@ $file_exists = file_exists($file_path);
           Description
         </p> -->
 
-        <a href="<?= $jio_path .  $url_host . bin2hex($cid . '=?=' . $id) ?>"
+        <a href="<?= $safe_watch_href ?>"
           class="inline-block w-full sm:w-auto px-4 py-2 md:px-8 md:py-3 
                   bg-gradient-to-r from-purple-600 to-pink-600 
                   hover:from-purple-700 hover:to-pink-700 
@@ -194,7 +344,7 @@ $file_exists = file_exists($file_path);
                 <div><?= htmlspecialchars($dateComponents['month']) ?> <?= htmlspecialchars($dateComponents['year']) ?></div>
               </div>
             </div>
-            <a href="<?= htmlspecialchars($jio_path) . $cp_url_host . htmlspecialchars($cp_link) ?>"
+            <a href="<?= htmlspecialchars($cp_url_host . $cp_link) ?>"
               class="inline-block w-full sm:w-auto px-4 py-2 bg-purple-800 hover:bg-purple-700 rounded-lg transition-colors">
               Watch Catchup
             </a>

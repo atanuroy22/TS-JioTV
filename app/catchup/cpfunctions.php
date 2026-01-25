@@ -12,13 +12,29 @@ $PROXY = $config['settings']['proxy'] ?? null;
 define('DATA_FOLDER', '../assets/data');
 define('TOKEN_EXPIRY_TIME', 7000);
 
-// Determine protocol, local IP address
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://';
-$local_ip = getHostByName(php_uname('n'));
-$host_jio = ($_SERVER['SERVER_ADDR'] !== '127.0.0.1' && $_SERVER['SERVER_ADDR'] !== 'localhost') ? $_SERVER['HTTP_HOST'] : $local_ip;
+$forwarded_proto = trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+if ($forwarded_proto !== '' && strpos($forwarded_proto, ',') !== false) {
+  $forwarded_proto = trim(explode(',', $forwarded_proto, 2)[0]);
+}
+$protocol = ($forwarded_proto === 'https' || $forwarded_proto === 'http')
+  ? ($forwarded_proto . '://')
+  : (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://');
 
-if (strpos($host_jio, $_SERVER['SERVER_PORT']) === false) {
-  $host_jio .= ':' . $_SERVER['SERVER_PORT'];
+$forwarded_host = trim((string)($_SERVER['HTTP_X_FORWARDED_HOST'] ?? ''));
+if ($forwarded_host !== '' && strpos($forwarded_host, ',') !== false) {
+  $forwarded_host = trim(explode(',', $forwarded_host, 2)[0]);
+}
+$host_jio = $forwarded_host !== '' ? $forwarded_host : trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+
+if ($host_jio === '') {
+  $host_jio = getHostByName(php_uname('n'));
+}
+
+if (strpos($host_jio, ':') === false) {
+  $server_port = (int)($_SERVER['SERVER_PORT'] ?? 0);
+  if ($server_port !== 0 && $server_port !== 80 && $server_port !== 443) {
+    $host_jio .= ':' . $server_port;
+  }
 }
 
 $jio_path = $protocol . $host_jio . str_replace(" ", "%20", str_replace(basename($_SERVER['PHP_SELF']), '', $_SERVER['PHP_SELF']));

@@ -59,6 +59,8 @@
     const logoUrl = String(raw.logoUrl ?? "");
     const cid = parseCidFromLogoUrl(logoUrl) || name.replace(/\s+/g, "_");
     const id = raw.channel_id;
+    const sourceType = String(raw.sourceType ?? "jio");
+    const streamUrl = String(raw.streamUrl ?? "");
 
     return {
       id,
@@ -71,6 +73,8 @@
       isCatchup,
       cid,
       logoUrl,
+      sourceType,
+      streamUrl,
     };
   }
 
@@ -136,10 +140,14 @@
     for (let i = 0; i < channels.length; i++) {
       const ch = channels[i];
       const catchupFlag = ch.isCatchup ? "1" : "0";
-      const encoded = toHex(`${ch.cid}=?=${ch.id}=?=${catchupFlag}`);
-      const href = `${detailsBase}${encoded}`;
+      const isExternal = ch.sourceType === "ext";
+      const href = isExternal
+        ? `app/details.php?ext=${encodeURIComponent(String(ch.id))}`
+        : `${detailsBase}${toHex(`${ch.cid}=?=${ch.id}=?=${catchupFlag}`)}`;
       const badge = ch.isCatchup
         ? '<span class="absolute top-2 right-2 text-[10px] px-2 py-1 rounded-full bg-purple-700/80 text-white">Catchup</span>'
+        : isExternal
+        ? '<span class="absolute top-2 right-2 text-[10px] px-2 py-1 rounded-full bg-blue-700/80 text-white">HTTPS</span>'
         : '<span class="absolute top-2 right-2 text-[10px] px-2 py-1 rounded-full bg-gray-700/80 text-white">Live</span>';
 
       parts[i] = `

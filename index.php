@@ -25,9 +25,9 @@ if ($file_exists) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JioTV+ ReBorn</title>
+    <title>JioTV+</title>
     <link rel="icon" href="https://ik.imagekit.io/techiesneh/tv_logo/jtv-plus_TMaGGk6N0.png" type="image/png">
-    <meta name="description" content="ENJOY FREE LIVE JIOTV">
+    <meta name="description" content="ENJOY LIVE JIOTV">
     <meta name="keywords" content="JIOTV, LIVETV, SPORTS, MOVIES, MUSIC">
     <meta name="author" content="Techie Sneh">
     <!-- Tailwind CSS -->
