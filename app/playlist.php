@@ -10,10 +10,6 @@ include "functions.php";
 // Generate a unique filename for the M3U playlist
 $jio_fname = 'TS-JioTV_' . md5(time() . 'JioTV') . '.m3u';
 
-// Set HTTP headers
-header("Content-Type: application/vnd.apple.mpegurl");
-header("Content-Disposition: inline; filename=$jio_fname");
-
 // Determine the protocol and host
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://';
 $local_ip = getHostByName(php_uname('n'));
@@ -28,7 +24,47 @@ $jio_path = $protocol . $host_jio . str_replace(" ", "%20", str_replace(basename
 
 // Decode the URL and fetch the JSON data
 $url = "==gbvNnauEGdhR2bpp2L2R3bpp2LnBXZ2R3LvlmLiVHa0l2ZuYDO3UHa0RXat9yL6MHc0RHa";
-$json_data = file_get_contents(base64_decode(strrev($url)));
+$remote_url = base64_decode(strrev($url));
+$cache_file = __DIR__ . '/assets/data/jiodata.json';
+$cache_ttl_seconds = 21600;
+
+$json_data = null;
+if (file_exists($cache_file) && (time() - filemtime($cache_file)) < $cache_ttl_seconds) {
+    $json_data = file_get_contents($cache_file);
+}
+
+if (empty($json_data)) {
+    $context = stream_context_create([
+        'http' => [
+            'timeout' => 8,
+            'header' => "User-Agent: TS-JioTV\r\n",
+        ],
+        'https' => [
+            'timeout' => 8,
+            'header' => "User-Agent: TS-JioTV\r\n",
+        ],
+    ]);
+    $fresh_data = @file_get_contents($remote_url, false, $context);
+
+    if (!empty($fresh_data) && json_decode($fresh_data, true) !== null) {
+        $json_data = $fresh_data;
+        @file_put_contents($cache_file, $fresh_data, LOCK_EX);
+    } elseif (file_exists($cache_file)) {
+        $json_data = file_get_contents($cache_file);
+    }
+}
+
+$format = $_GET['format'] ?? '';
+if ($format === 'json') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo $json_data ?: '[]';
+    exit;
+}
+
+// Set HTTP headers
+header("Content-Type: application/vnd.apple.mpegurl");
+header("Content-Disposition: inline; filename=$jio_fname");
+
 $json = json_decode($json_data, true);
 
 // Start generating the M3U data

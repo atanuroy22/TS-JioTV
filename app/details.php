@@ -59,9 +59,13 @@ $file_exists = file_exists($file_path);
   <title><?= $name ?> | JioTV+ ReBorn</title>
   <link rel="icon" href="https://ik.imagekit.io/techiesneh/tv_logo/jtv-plus_TMaGGk6N0.png" type="image/png">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
   <script src="https://code.iconify.design/2/2.1.2/iconify.min.js"></script>
   <style>
+    * {
+      animation: none !important;
+      transition: none !important;
+    }
+
     .glass-effect {
       background: rgba(17, 24, 39, 0.8);
       backdrop-filter: blur(10px);
@@ -76,12 +80,9 @@ $file_exists = file_exists($file_path);
 
     .date-card {
       background: rgba(31, 41, 55, 0.6);
-      transition: all 0.3s ease;
     }
 
     .date-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
     }
   </style>
 </head>
@@ -266,20 +267,12 @@ $file_exists = file_exists($file_path);
 
   <footer class="bg-gray-800 mt-12 py-4">
     <div class="container mx-auto text-center text-gray-400">
-      <p>&copy; 2021-<?= date('Y') ?> SnehTV, Inc. All rights reserved.</p>
+      <p>&copy; 2021-<?= date('Y') ?> Atanu, Inc. All rights reserved.</p>
     </div>
   </footer>
 
-  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
   <script src="assets/js/button.js"></script>
   <script>
-    // Initialize animations
-    AOS.init({
-      duration: 800,
-      once: false,
-      easing: 'ease-in-out-quad'
-    });
-
     // Real-time clock update
     function updateClock() {
       const timeElement = document.getElementById('live-clock');

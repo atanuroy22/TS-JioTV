@@ -32,8 +32,6 @@ if ($file_exists) {
     <meta name="author" content="Techie Sneh">
     <!-- Tailwind CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <!-- AOS Animation -->
-    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     <!-- Custom Styles -->
     <style>
         .gradient-text {
@@ -42,13 +40,9 @@ if ($file_exists) {
             -webkit-text-fill-color: transparent;
         }
 
-        .card-hover {
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .card-hover:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        * {
+            animation: none !important;
+            transition: none !important;
         }
 
         ::-webkit-scrollbar {
@@ -74,20 +68,26 @@ if ($file_exists) {
             </div>
             <!-- In Header Section -->
             <div id="userButtons" class="flex gap-2" data-aos="fade-left">
+                <!--
                 <button class="p-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg transition-all group relative" id="loginButton">
                     <span class="iconify text-xl" data-icon="mdi:account"></span>
                     <span class="sr-only">Login</span>
                 </button>
+                -->
+                <button id="loginButton" type="button" class="hidden" aria-hidden="true" tabindex="-1"></button>
 
                 <button class="p-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg transition-all group relative" id="refreshButton">
                     <span class="iconify text-xl" data-icon="mdi:reload"></span>
                     <span class="sr-only">Refresh</span>
                 </button>
 
+                <!--
                 <button class="p-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg transition-all group relative" id="logoutButton">
                     <span class="iconify text-xl" data-icon="mdi:logout"></span>
                     <span class="sr-only">Logout</span>
                 </button>
+                -->
+                <button id="logoutButton" type="button" class="hidden" aria-hidden="true" tabindex="-1"></button>
 
                 <button class="p-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg transition-all group relative" id="PlayListButton">
                     <span class="iconify text-xl" data-icon="mdi:playlist-music"></span>
@@ -214,7 +214,7 @@ if ($file_exists) {
 
     <footer class="bg-gray-800 mt-12 py-4">
         <div class="container mx-auto text-center text-gray-400">
-            <p>&copy; 2021-<?= date('Y') ?> SnehTV, Inc. All rights reserved.</p>
+            <p>&copy; 2021-<?= date('Y') ?> Atanu, Inc. All rights reserved.</p>
         </div>
     </footer>
 
@@ -223,8 +223,6 @@ if ($file_exists) {
     <script src="https://code.iconify.design/2/2.1.2/iconify.min.js"></script>
     <!-- LazySizes Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lazysizes/5.3.2/lazysizes.min.js" async></script>
-    <!-- AOS Animation Library -->
-    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <!-- Custom Scripts -->
     <script>
         const isApache = <?= $isApache ? 'true' : 'false' ?>;
@@ -232,14 +230,6 @@ if ($file_exists) {
     </script>
     <script src="app/assets/js/search.js"></script>
     <script src="app/assets/js/button.js"></script>
-    <script>
-        // Initialize animations
-        AOS.init({
-            duration: 800,
-            easing: 'ease-out-quad',
-            once: false
-        });
-    </script>
 </body>
 
 </html>

@@ -5,7 +5,7 @@
   
   [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/mitthu786/TS-JioTV/blob/main/LICENSE)
   [![PHP Version](https://img.shields.io/badge/PHP-7.4%2B-blue.svg)](https://php.net/)
-  [![Telegram Channel](https://img.shields.io/badge/Join-Telegram%20Channel-blue.svg)](https://tsneh.vercel.app/ts-tg)
+  [![Telegram Channel](https://img.shields.io/badge/Join-Telegram%20Channel-blue.svg)](https://t.me/atanuroy2222)
 </div>
 
 ---
@@ -67,7 +67,7 @@
 
 ### 🅱️ **Step 2: Get TS-JioTV Files**
 
-- 📥 [Download TS-JioTV ZIP](https://tsnehcors.mitthu.workers.dev/?https://github.com/mitthu786/TS-JioTV/blob/main/TS-JioTV.zip?raw=true)
+- 📥 [Download TS-JioTV ZIP](https://raw.githubusercontent.com/atanuroy22/TS-JioTV/main/TS-JioTV.zip)
 - Extract files into **LocalHost `Htdocs` Root Folder**
 
 ### 🅾️ **Step 3: Start Your Server**
@@ -107,17 +107,19 @@
 
 ---
 
-## ⭐ Star History & Popularity
+<!-- ## ⭐ Star History & Popularity
 
-## [![Star History Chart](https://api.star-history.com/svg?repos=mitthu786/TS-JioTV&type=Date)](https://www.star-history.com/#mitthu786/TS-JioTV&Date)
+## [![Star History Chart](https://api.star-history.com/svg?repos=atanuroy22/TS-JioTV&type=Date)](https://www.star-history.com/#atanuroy22/TS-JioTV&Date) -->
 
-## 📞 Contact & Support
+Special Thanks the author [mitthu786](https://github.com/mitthu786) for the script.
 
-- 📢 **Join Our Telegram Community:** [Click Here](https://tsneh.vercel.app/ts-tg)
-- ✉️ **Support & Queries:** [Email Us](mailto:techiesneh@protonmail.com)
+<!-- ## 📞 Contact & Support -->
 
----
+<!-- - 📢 **Join Our Telegram Community:** [Click Here](https://tsneh.vercel.app/ts-tg)
+- ✉️ **Support & Queries:** [Email Us](mailto:techiesneh@protonmail.com) -->
+
+<!-- --- -->
 
 <div align="center">
-  <strong>© 2021-25 👨🏻‍💻 Techie Sneh</strong>
+  <strong>© 2021-25 👨🏻‍💻 Atanu Roy</strong>
 </div>
