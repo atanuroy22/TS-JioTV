@@ -1,9 +1,9 @@
-<!-- <div align="center">
+<div align="center">
   <img src="https://i.ibb.co/BcjC6R8/jiotv.png" width="120">
   <h1 align="center">TS-JioTV : ReBorn</h1>
   <p align="center">PHP Script for JioTV Streaming with Catchup & Multi-Device Support</p>
   
-  [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/mitthu786/TS-JioTV/blob/main/LICENSE)
+  [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/atanuroy22/TS-JioTV/blob/main/LICENSE)
   [![PHP Version](https://img.shields.io/badge/PHP-7.4%2B-blue.svg)](https://php.net/)
   [![Telegram Channel](https://img.shields.io/badge/Join-Telegram%20Channel-blue.svg)](https://t.me/atanuroy2222)
 </div>
@@ -122,4 +122,5 @@
 
 <div align="center">
   <strong>© 2021-25 👨🏻‍💻 Atanu Roy</strong>
-</div> -->
+</div>
+
